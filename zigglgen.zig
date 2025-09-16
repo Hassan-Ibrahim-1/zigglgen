@@ -634,10 +634,6 @@ fn renderCode(
         \\            .{err_string},
         \\        );
         \\    }
-        \\    if (had_error) {
-        \\        std.debug.dumpCurrentStackTrace(0);
-        \\        unreachable;
-        \\    }
         \\}
     );
     var command_it = commands.iterator();
