@@ -8,6 +8,7 @@
 api: Api,
 version: Version,
 profile: ?Profile = null,
+extra_debug: bool = false,
 extensions: []const Extension = &.{},
 
 pub const Api = enum { gl, gles, glsc };

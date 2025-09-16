@@ -64,6 +64,9 @@ pub fn generateBindingsSourceFile(b: *std.Build, options: GeneratorOptions) std.
         if (options.profile != null) "-" else "",
         if (options.profile) |profile| @tagName(profile) else "",
     }));
+    if (options.extra_debug) {
+        run_zigglgen.addArg("-g");
+    }
     for (options.extensions) |extension| {
         run_zigglgen.addArg(@tagName(extension));
     }

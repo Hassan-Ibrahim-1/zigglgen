@@ -9,7 +9,7 @@ const registry = @import("api_registry.zig");
 
 const post_writergate = @hasDecl(std, "Io"); // TODO: Remove after 0.15 (also audit std.Io.Writer code)
 
-/// Usage: `zigglen <api>-<version>[-<profile>] [<extension> ...]`
+/// Usage: `zigglen <api>-<version>[-<profile>] [<extension> ...] [-g]`
 pub fn main() !void {
     var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_state.deinit();
@@ -27,7 +27,14 @@ pub fn main() !void {
 
     var extensions: ResolvedExtensions = .{};
     var resolve_everything = false;
-    while (arg_it.next()) |raw_extension| {
+    var extra_debug = false;
+    while (arg_it.next()) |arg| {
+        if (std.mem.eql(u8, arg, "-g")) {
+            extra_debug = true;
+            continue;
+        }
+
+        const raw_extension = arg;
         if (std.mem.eql(u8, raw_extension, "ZIGGLGEN_everything")) { // For internal testing.
             resolve_everything = true;
             continue;
@@ -49,12 +56,32 @@ pub fn main() !void {
         var stdout_buffer: [4096]u8 = undefined;
         var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
         const stdout = &stdout_writer.interface;
-        try renderCode(stdout, api, version, profile, &extensions, &types, &constants, &commands);
+        try renderCode(
+            stdout,
+            api,
+            version,
+            profile,
+            extra_debug,
+            &extensions,
+            &types,
+            &constants,
+            &commands,
+        );
         try stdout.flush();
     } else {
         var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
         const stdout = bw.writer();
-        try renderCode(stdout, api, version, profile, &extensions, &types, &constants, &commands);
+        try renderCode(
+            stdout,
+            api,
+            version,
+            profile,
+            extra_debug,
+            &extensions,
+            &types,
+            &constants,
+            &commands,
+        );
         try bw.flush();
     }
 }
@@ -396,6 +423,7 @@ fn renderCode(
     api: registry.Api.Name,
     version: [2]u8,
     profile: ?registry.ProfileName,
+    extra_debug: bool,
     extensions: *ResolvedExtensions,
     types: *ResolvedTypes,
     constants: *ResolvedConstants,
@@ -588,6 +616,29 @@ fn renderCode(
         \\
         \\//#region Commands
         \\
+        \\/// panics when an error is found
+        \\pub fn checkGlError() void {
+        \\    var had_error = false;
+        \\    var err: u32 = GetError();
+        \\    while (err != NO_ERROR) : (err = GetError()) {
+        \\        had_error = true;
+        \\        const err_string = switch (err) {
+        \\            INVALID_VALUE => "INVALID_VALUE",
+        \\            INVALID_OPERATION => "INVALID_OPERATION",
+        \\            OUT_OF_MEMORY => "OUT_OF_MEMORY",
+        \\            INVALID_FRAMEBUFFER_OPERATION => "INVALID_FRAMEBUFFER_OPERATION",
+        \\            else => "unknown opengl error",
+        \\        };
+        \\        std.log.err(
+        \\            "had gl error {s}",
+        \\            .{err_string},
+        \\        );
+        \\    }
+        \\    if (had_error) {
+        \\        std.debug.dumpCurrentStackTrace(0);
+        \\        @panic("had an opengl error");
+        \\    }
+        \\}
     );
     var command_it = commands.iterator();
     while (command_it.next()) |command| {
@@ -595,11 +646,25 @@ fn renderCode(
         try renderParams(writer, command, false);
         try writer.writeAll(") callconv(APIENTRY) ");
         try renderReturnType(writer, command);
-        try writer.print(" {{\n    return ProcTable.current.?.{f}", .{fmtIdFlags(@tagName(command.key), .{ .allow_primitive = true, .allow_underscore = true })});
-        if (!command.value.required) try writer.writeAll(".?");
-        try writer.writeAll("(");
-        try renderParams(writer, command, true);
-        try writer.writeAll(");\n}\n");
+
+        try writer.print(" {{\n", .{});
+
+        if (extra_debug) {
+            try writer.print("    const ret = ProcTable.current.?.{f}", .{fmtIdFlags(@tagName(command.key), .{ .allow_primitive = true, .allow_underscore = true })});
+            if (!command.value.required) try writer.writeAll(".?");
+            try writer.writeAll("(");
+            try renderParams(writer, command, true);
+            try writer.writeAll(");\n");
+            try writer.print("    checkGlError();\n", .{});
+            try writer.print("    return ret;\n", .{});
+        } else {
+            try writer.print("    return ProcTable.current.?.{f}", .{fmtIdFlags(@tagName(command.key), .{ .allow_primitive = true, .allow_underscore = true })});
+            if (!command.value.required) try writer.writeAll(".?");
+            try writer.writeAll("(");
+            try renderParams(writer, command, true);
+            try writer.writeAll(");\n");
+        }
+        try writer.writeAll("}\n\n");
     }
     try writer.writeAll(
         \\//#endregion Commands
