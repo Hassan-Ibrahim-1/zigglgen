@@ -621,6 +621,7 @@ fn renderCode(
         \\    var had_error = false;
         \\    var err: u32 = GetError();
         \\    while (err != NO_ERROR) : (err = GetError()) {
+        \\        std.debug.dumpCurrentStackTrace(0);
         \\        had_error = true;
         \\        const err_string = switch (err) {
         \\            INVALID_VALUE => "INVALID_VALUE",
@@ -634,7 +635,13 @@ fn renderCode(
         \\            .{err_string},
         \\        );
         \\    }
+        \\    if (had_error) {
+        \\        std.debug.dumpCurrentStackTrace(0);
+        \\        @panic("had gl error");
+        \\    }
         \\}
+        \\
+        \\
     );
     var command_it = commands.iterator();
     while (command_it.next()) |command| {
@@ -645,7 +652,7 @@ fn renderCode(
 
         try writer.print(" {{\n", .{});
 
-        if (extra_debug) {
+        if (extra_debug and command.key != .GetError) {
             try writer.print("    const ret = ProcTable.current.?.{f}", .{fmtIdFlags(@tagName(command.key), .{ .allow_primitive = true, .allow_underscore = true })});
             if (!command.value.required) try writer.writeAll(".?");
             try writer.writeAll("(");
