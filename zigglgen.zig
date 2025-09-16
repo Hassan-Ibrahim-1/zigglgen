@@ -629,14 +629,14 @@ fn renderCode(
         \\            INVALID_FRAMEBUFFER_OPERATION => "INVALID_FRAMEBUFFER_OPERATION",
         \\            else => "unknown opengl error",
         \\        };
-        \\        std.log.err(
+        \\        std.debug.print(
         \\            "had gl error {s}",
         \\            .{err_string},
         \\        );
         \\    }
         \\    if (had_error) {
         \\        std.debug.dumpCurrentStackTrace(0);
-        \\        @panic("had an opengl error");
+        \\        unreachable;
         \\    }
         \\}
     );
