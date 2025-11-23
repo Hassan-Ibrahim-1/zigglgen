@@ -3,7 +3,7 @@
 SPDX-License-Identifier: MIT
 -->
 ### About the fork
-This fork adds a check after every GL function call to see if an error has occurred. That's about it.
+This fork adds an optional check after every GL function call to see if an error has occurred. That's about it.
 
 # zigglgen
 
